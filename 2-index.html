@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор мелодий</title>
+    <style>
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(16, 30px);
+            grid-gap: 5px;
+        } .cell {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            position: relative;
+    font-size: 10px;
+    text-align: center;
+    line-height: 30px;
+    color: #666;
+    overflow: hidden;
+        }
+        .cell.active {
+            background-color: #4caf50;
+            font-weight: bold;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+        
+        .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.control-button {
+    padding: 10px 20px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.control-button:hover {
+    background-color: #45a049;
+}
+
+.control-button:active {
+    background-color: #3e8e41;
+}
+
+.control-slider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.control-slider label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+
+.control-slider input[type="range"] {
+    flex: 1;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #ddd;
+    border-radius: 5px;
+    outline: none;
+    transition: background 0.3s ease;
+}
+
+.control-slider input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    background: #4caf50;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.control-slider input[type="range"]::-webkit-slider-thumb:hover {
+    background-color: #45a049;
+}
+
+.control-slider input[type="range"]::-webkit-slider-thumb:active {
+    background-color: #3e8e41;
+}
+
+#grid {
+    overflow-y: auto;
+    max-height: 300px;
+    border: 1px solid #ddd;
+}
+#notes {
+    overflow-y: auto;
+    max-height: 300px;
+    color:#fff;
+}
+    </style>
+</head>
+<body>
+    <h1>Генератор Рингтонов</h1>
+    
+    <div style="display: flex;">
+    <div id="notes" style="display: flex; flex-direction: column; justify-content: space-between; margin-right: 10px;">
+        <!-- Здесь будут отображаться ноты -->
+    </div>
+    <div class="grid" id="grid"></div>
+</div>
+
+<div class="controls">
+    <button id="play">Играть</button>
+    <button id="stop">Стоп</button>
+    <button id="clear">Очистить</button>
+    <button id="save">Сохранить</button>
+    <button id="load">Загрузить</button>
+    <label>
+        Скорость:
+        <input type="range" id="speed" min="100" max="1000" step="10" value="10">
+    </label>
+    <label>
+        Громкость:
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="0.2">
+    </label>
+    <label>
+        Тип волны:
+        <select id="waveType">
+            <option value="sine">Синус</option>
+            <option value="square">Квадрат</option>
+            <option value="triangle">Треугольник</option>
+            <option value="sawtooth">Пила</option>
+        </select>
+    </label>
+    <label>
+        Повтор:
+        <input type="checkbox" id="loop">
+    </label>
+    <label>
+    Вибрация (частота):
+    <input type="range" id="vibrationFrequency" min="0" max="20" step="1" value="5">
+</label>
+<label>
+    Вибрация (амплитуда):
+    <input type="range" id="vibrationDepth" min="10" max="50" step="5" value="50">
+</label>
+<label>
+    Включить вибрацию:
+    <input type="checkbox" id="enableVibration" checked>
+</label>
+<button id="saveAudio">Сохранить мелодию</button>
+
+</div>
+
+  <script>
+    // HTML-элементы
+    const grid = document.getElementById("grid");
+    const playButton = document.getElementById("play");
+    const stopButton = document.getElementById("stop");
+    const clearButton = document.getElementById("clear");
+    const notesContainer = document.getElementById("notes");
+    const speedControl = document.getElementById("speed");
+    const volumeControl = document.getElementById("volume");
+    const waveTypeSelect = document.getElementById("waveType");
+    const saveButton = document.getElementById("save");
+    const loadButton = document.getElementById("load");
+    const loopCheckbox = document.getElementById("loop");
+    const enableVibrationCheckbox = document.getElementById("enableVibration");
+    const saveAudioButton = document.getElementById("saveAudio");
+
+    // Набор нот
+    const notes = [
+      "C2", "D2", "E2", "F2", "G2", "A2", "B2",
+      "C3", "D3", "E3", "F3", "G3", "A3", "B3",
+      "C4", "D4", "E4", "F4", "G4", "A4", "B4",
+      "C5", "D5", "E5", "F5", "G5", "A5", "B5",
+      "C6", "D6", "E6", "F6", "G6", "A6", "B6"
+    ];
+    const rows = notes.length; // 35
+    const cols = 16;          // 16 шагов по горизонтали
+
+    // Глобальный AudioContext для "живого" воспроизведения
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Массивы для хранения
+    let activeCells = Array(rows).fill(null).map(() => Array(cols).fill(false));
+    let durations = Array(rows).fill(null).map(() => Array(cols).fill(300)); // в мс
+    let playbackQueue = [];
+    let savedMelody = [];
+
+    // Глобальные флаги и переменные
+    let isLooping = false;
+    let isPlaying = false;
+    let playbackSpeed = 200; // задержка между нотами (мс)
+    let globalVolume = 0.5;
+    let isVibrationEnabled = enableVibrationCheckbox.checked;
+
+    // Отображаем названия нот (слева)
+    notes.forEach((note) => {
+      const noteLabel = document.createElement("div");
+      noteLabel.textContent = note;
+      noteLabel.style.height = "30px";
+      noteLabel.style.display = "flex";
+      noteLabel.style.alignItems = "center";
+      noteLabel.style.justifyContent = "flex-end";
+      noteLabel.style.marginRight = "10px";
+      notesContainer.appendChild(noteLabel);
+    });
+
+    // Создаём сетку клеток
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const cell = document.createElement("div");
+        cell.classList.add("cell");
+        cell.dataset.row = i;
+        cell.dataset.col = j;
+
+        cell.textContent = notes[i]; // чтобы визуально понимать, какая нота
+        cell.style.fontSize = "10px";
+        cell.style.textAlign = "center";
+        cell.style.lineHeight = "30px";
+
+        // Контекстное меню (правая кнопка) - задать длительность
+        cell.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          const duration = prompt("Введите длительность ноты (мс):", durations[i][j]);
+          if (duration && !isNaN(duration)) {
+            durations[i][j] = parseInt(duration);
+          }
+        });
+
+        grid.appendChild(cell);
+      }
+    }
+
+    // Клик левой кнопкой по клетке
+    grid.addEventListener("click", (e) => {
+      const cell = e.target;
+      if (cell.classList.contains("cell")) {
+        const row = parseInt(cell.dataset.row);
+        const col = parseInt(cell.dataset.col);
+
+        // Переключаем статус ячейки
+        if (activeCells[row][col]) {
+          // Убираем из очереди
+          playbackQueue = playbackQueue.filter(
+            item => !(item.row === row && item.col === col)
+          );
+        } else {
+          // Добавляем в очередь
+          playbackQueue.push({ row, col });
+        }
+
+        activeCells[row][col] = !activeCells[row][col];
+        cell.classList.toggle("active");
+      }
+    });
+
+    // === Воспроизведение вживую ===
+
+    playButton.addEventListener("click", () => {
+      if (isPlaying) return;
+      isPlaying = true;
+      playButton.disabled = true;
+
+      function playMelody() {
+        playbackQueue.forEach((item, index) => {
+          const { row, col } = item;
+          const note = notes[row];
+          const duration = durations[row][col];
+
+          setTimeout(() => {
+            if (!isPlaying) return;
+            playNote(note, duration);
+          }, index * playbackSpeed);
+        });
+
+        if (isLooping && isPlaying) {
+          // Ждём, пока все ноты отыграют, и повторяем
+          setTimeout(playMelody, playbackQueue.length * playbackSpeed);
+        } else {
+          // Иначе в конце освобождаем
+          setTimeout(() => {
+            isPlaying = false;
+            playButton.disabled = false;
+          }, playbackQueue.length * playbackSpeed);
+        }
+      }
+
+      playMelody();
+    });
+
+    // Стоп
+    stopButton.addEventListener("click", () => {
+      stopPlayback();
+    });
+
+    function stopPlayback() {
+      isPlaying = false;
+      playButton.disabled = false;
+      clearTimeouts();
+    }
+
+    // Сброс всех setTimeout
+    function clearTimeouts() {
+      let id = window.setTimeout(() => {}, 0);
+      while (id--) {
+        window.clearTimeout(id);
+      }
+    }
+
+    // Очистить сетку
+    clearButton.addEventListener("click", () => {
+      activeCells = Array(rows).fill(null).map(() => Array(cols).fill(false));
+      durations = Array(rows).fill(null).map(() => Array(cols).fill(300));
+      playbackQueue = [];
+      document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("active"));
+    });
+
+    // Сохранить мелодию (на странице)
+    saveButton.addEventListener("click", () => {
+      savedMelody = playbackQueue.map(({ row, col }) => ({
+        row,
+        col,
+        duration: durations[row][col]
+      }));
+      alert("Мелодия сохранена!");
+    });
+
+    // Загрузить мелодию
+    loadButton.addEventListener("click", () => {
+      if (!savedMelody.length) {
+        alert("Нет сохраненной мелодии!");
+        return;
+      }
+
+      // Сбрасываем всё
+      activeCells = Array(rows).fill(null).map(() => Array(cols).fill(false));
+      durations = Array(rows).fill(null).map(() => Array(cols).fill(300));
+      playbackQueue = [];
+      document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("active"));
+
+      // Восстанавливаем
+      savedMelody.forEach(({ row, col, duration }) => {
+        activeCells[row][col] = true;
+        durations[row][col] = duration;
+        playbackQueue.push({ row, col });
+
+        const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+        if (cell) cell.classList.add("active");
+      });
+
+      alert("Мелодия загружена!");
+    });
+
+    // Проверка, поддерживается ли вибрация
+    function isVibrationSupported() {
+      return "vibrate" in navigator;
+    }
+
+    // Проигрывание одной ноты
+    function playNote(note, duration) {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      const frequency = noteToFrequency(note);
+      oscillator.type = waveTypeSelect.value;
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+
+      gainNode.gain.setValueAtTime(globalVolume, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.001,
+        audioContext.currentTime + duration / 1000
+      );
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + duration / 1000);
+
+      // Вибрация
+      if (isVibrationEnabled && isVibrationSupported()) {
+        navigator.vibrate(duration);
+      }
+    }
+
+    // Преобразуем название (C4, D#5) в частоту
+    function noteToFrequency(note) {
+      const A4 = 440;
+      const semitones = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const octave = parseInt(note.slice(-1));
+      const keyNumber = semitones.indexOf(note.slice(0, -1));
+      // Смещение от A4
+      return A4 * Math.pow(2, (keyNumber + (octave - 4) * 12 - 9) / 12);
+    }
+
+    // Управление скоростью
+    speedControl.addEventListener("input", (e) => {
+      const maxSpeed = parseInt(speedControl.max, 10);
+      const minSpeed = parseInt(speedControl.min, 10);
+      const value = parseInt(e.target.value, 10);
+
+      // Инвертируем или используем прямо
+      playbackSpeed = maxSpeed - value + minSpeed;
+      // Можно и просто: playbackSpeed = value
+
+      console.log(`Скорость: ${playbackSpeed} мс между нотами`);
+    });
+
+    // Громкость
+    volumeControl.addEventListener("input", (e) => {
+      globalVolume = parseFloat(e.target.value);
+    });
+
+    // Зацикливание
+    loopCheckbox.addEventListener("change", (e) => {
+      isLooping = e.target.checked;
+    });
+
+    // Вибрация
+    enableVibrationCheckbox.addEventListener("change", (e) => {
+      isVibrationEnabled = e.target.checked;
+    });
+
+    // === Сохранение в WAV с учётом скорости и цикла ===
+    async function saveMelodyAsAudio() {
+      if (!playbackQueue.length) {
+        alert("Нет нот для сохранения!");
+        return;
+      }
+      
+      
+      
+      
+
+      // Определяем, сколько раз повторять мелодию в итоговом WAV
+      // Если включён loop, пусть повторит 2 раза. Можно поменять на любое число.
+      const loopRepeats = isLooping ? 3 : 1;
+
+      // 1. Считаем длительность одного прохода
+      let singlePassTimeSec = 0;
+      playbackQueue.forEach(({ row, col }) => {
+        const durationSec = durations[row][col] / 1000; 
+        singlePassTimeSec += durationSec;
+        singlePassTimeSec += playbackSpeed / 1000;
+        
+        
+        
+      });
+
+      // Итого, умножаем на кол-во повторов + запас 1 сек
+      let totalTimeSec = singlePassTimeSec * loopRepeats + 0.5;
+
+      // 2. Создаём OfflineAudioContext под рассчитанное время
+      const sampleRate = 44100;
+      const totalFrames = Math.ceil(sampleRate * totalTimeSec);
+      const offlineAudioContext = new OfflineAudioContext(1, totalFrames, sampleRate);
+
+      // 3. Генерируем ноты в офлайн-контексте (с повтором, если нужно)
+      let currentTime = 0;
+
+      for (let i = 0; i < loopRepeats; i++) {
+        playbackQueue.forEach(({ row, col }) => {
+          const duration = durations[row][col] / 1000; 
+          const frequency = noteToFrequency(notes[row]);
+
+          const oscillator = offlineAudioContext.createOscillator();
+          const gainNode = offlineAudioContext.createGain();
+
+          oscillator.type = waveTypeSelect.value;
+          oscillator.frequency.setValueAtTime(frequency, currentTime);
+
+          gainNode.gain.setValueAtTime(globalVolume, currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.001,
+            currentTime + duration
+          );
+
+          oscillator.connect(gainNode);
+          gainNode.connect(offlineAudioContext.destination);
+
+          oscillator.start(currentTime);
+          oscillator.stop(currentTime + duration);
+
+          // Переходим к следующей ноте
+          currentTime += duration + playbackSpeed / 1000;
+        });
+      }
+
+      // 4. Рендерим
+      const renderedBuffer = await offlineAudioContext.startRendering();
+
+      // 5. Создаём WAV
+      const wavFile = createWAVFile(renderedBuffer);
+
+      // 6. Blob + скачка
+      const blob = new Blob([wavFile], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "melody.wav";
+      a.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+    // Утилита для генерации WAV-файла из AudioBuffer
+    function createWAVFile(buffer) {
+      const numberOfChannels = buffer.numberOfChannels; // 1, т.к. мы создали моно
+      const sampleRate = buffer.sampleRate; // 44100
+      const length = buffer.length * numberOfChannels;
+      const data = new Float32Array(length);
+      const interleaved = new Int16Array(length);
+
+      // Считываем данные из буфера (по каналам)
+      for (let i = 0; i < numberOfChannels; i++) {
+        data.set(buffer.getChannelData(i), i * buffer.length);
+      }
+
+      // Конверсия float -> 16-bit PCM
+      for (let i = 0; i < length; i++) {
+        interleaved[i] = Math.max(-1, Math.min(1, data[i])) * 0x7FFF;
+      }
+
+      // Заголовок WAV
+      const wavHeader = new Uint8Array(44);
+      const view = new DataView(wavHeader.buffer);
+
+      // Заполняем заголовок
+      view.setUint32(0, 0x46464952, true); // "RIFF"
+      view.setUint32(4, 36 + interleaved.length * 2, true); // file size
+      view.setUint32(8, 0x45564157, true); // "WAVE"
+      view.setUint32(12, 0x20746D66, true); // "fmt "
+      view.setUint32(16, 16, true); // Subchunk1Size
+      view.setUint16(20, 1, true); // PCM (1)
+      view.setUint16(22, numberOfChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+      view.setUint16(32, numberOfChannels * 2, true);
+      view.setUint16(34, 16, true); // bits per sample
+      view.setUint32(36, 0x61746164, true); // "data"
+      view.setUint32(40, interleaved.length * 2, true);
+
+      // Склеиваем заголовок и данные
+      const wavFile = new Uint8Array(wavHeader.length + interleaved.length * 2);
+      wavFile.set(wavHeader, 0);
+      wavFile.set(new Uint8Array(interleaved.buffer), wavHeader.length);
+
+      return wavFile;
+    }
+
+    // Кнопка "Сохранить в WAV"
+    saveAudioButton.addEventListener("click", saveMelodyAsAudio);
+  </script>
+</body>
+</html>
