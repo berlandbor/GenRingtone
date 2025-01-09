@@ -500,7 +500,8 @@
           oscillator.stop(currentTime + duration);
 
           // Переходим к следующей ноте
-          currentTime += duration + playbackSpeed / 1000;
+          //currentTime += duration + playbackSpeed / 1000;
+          currentTime += playbackSpeed / 1000;
         });
       }
 
